@@ -2,7 +2,11 @@
 
 ## Introduction
 
-This repository records my attempt at a complete implementation of Stanford university's [Pintos](https://web.stanford.edu/class/cs140/projects/) Operating System. The table below showcases my progress
+This repository records my attempt at a complete implementation of Stanford university's [Pintos](https://web.stanford.edu/class/cs140/projects/) Operating System. The table below showcases my progress.
+
+| Project | Status | Implementation | Design Document |
+| --- | --- | --- | --- |
+| Project 1: Threads | Complete — all 27 tests passed | [threads branch](../../tree/threads) | [DESIGNDOC_threads.md](../../blob/threads/src/threads/DESIGNDOC_threads.md) |
 
 
 ## Installation Instructions
