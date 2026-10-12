@@ -11,6 +11,7 @@ enum thread_status
     THREAD_RUNNING,     /* Running thread. */
     THREAD_READY,       /* Not running but ready to run. */
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
+    THREAD_SLEEPING,    /* Sleeping thread. */
     THREAD_DYING        /* About to be destroyed. */
   };
 
@@ -23,6 +24,11 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+
+/* Thread niceness. */
+#define NICE_MIN -20
+#define NICE_DEFAULT 0
+#define NICE_MAX 20
 
 /* A kernel thread or user process.
 
@@ -88,7 +94,14 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+    int current_priority;               /* Current priority. */
+    int nice;                           /* Niceness of the thread. */
+    int32_t recent_cpu;                 /* To track latest CPU time. */
     struct list_elem allelem;           /* List element for all threads list. */
+    struct list owned_locks_list;       /* Keeps a record of the locks owned by the thread. */
+    struct lock* wait_lock;             /* Keeps a record of the lock the thread is waiting to ACQUIRE. */
+    int64_t sleep_time;                 /* Keeps track of wake_time if any. */
+    int64_t start_time;                 /* Keeps track of the time at which a thread is put to sleep. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -101,6 +114,9 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+
+  /* List of all sleeping processes. */
+extern struct list sleeping_list;
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -125,6 +141,7 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+void thread_sleep (int64_t ticks);
 
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);
@@ -132,10 +149,21 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
+void thread_reset_priority (void);
+int thread_donate_priority (struct thread *receiver);
+
+/* The functions below are used when running PINTOS using
+   an MLFQ scheduler. */
+void update_load_avg (void);
+void thread_increment_recent_cpu (void);
+void update_recent_cpu (struct thread *t, void *aux UNUSED);
+void update_priority (struct thread *t, void *aux UNUSED);
 
 int thread_get_nice (void);
-void thread_set_nice (int);
+void thread_set_nice (int nice UNUSED);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+void sort_ready_list (void);
 
 #endif /* threads/thread.h */

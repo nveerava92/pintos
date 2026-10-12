@@ -7,6 +7,9 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+
+static bool
+greater_ticks (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
   
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -85,15 +88,25 @@ timer_elapsed (int64_t then)
 }
 
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
-   be turned on. */
+   be turned on. Works by scheduling the next thread in READY_LIST.
+   The calling thread sleeps for at least TICKS timer ticks as long as
+   there are threads in the READY_LIST to execute. Otherwise,
+   returns immediately. */
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+
+  enum intr_level old_level = intr_disable ();
+
+  thread_current ()->sleep_time = ticks;
+  thread_current ()->start_time = timer_ticks ();
+  list_insert_ordered (&sleeping_list, &thread_current ()->elem, greater_ticks, NULL);
+  thread_block ();
+
+  intr_set_level (old_level);
+
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -166,12 +179,51 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-/* Timer interrupt handler. */
+/* Timer interrupt handler. This function is responsible for waking up the
+   SLEEPING THREADS on time.*/
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+
+  struct list_elem *e;
+
+  if (!list_empty (&sleeping_list))
+  {
+    for (e = list_front (&sleeping_list); e != list_end (&sleeping_list);)
+    {
+      struct thread *cur = list_entry (e, struct thread, elem);
+      if (timer_elapsed (cur->start_time) >= cur->sleep_time)
+      {
+        e = list_remove (e);
+        thread_unblock (cur);
+      } else
+      {
+        e = list_next (e);
+      }
+    }
+  }
+
+  if (thread_mlfqs) 
+  {
+    // Need to increment recent_cpu of INTERRUPTED THREAD
+    thread_increment_recent_cpu ();
+
+    // At the immediate incidence of a second, we need to update
+    // recent_cpu time for all threads.
+    if (timer_ticks () % TIMER_FREQ == 0)
+    {
+      update_load_avg ();
+      thread_foreach (&update_recent_cpu, NULL);
+    
+    /* Every 4th tick starting with 0. Therefore its remainder will be 3 and not 0. */
+    } else if (timer_ticks () % 4 == 3)
+    {
+      thread_foreach(&update_priority, NULL);
+      sort_ready_list ();
+    }
+  }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
@@ -243,4 +295,16 @@ real_time_delay (int64_t num, int32_t denom)
      the possibility of overflow. */
   ASSERT (denom % 1000 == 0);
   busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000)); 
+}
+
+static bool
+greater_ticks (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *t_a, *t_b;
+
+  // getting the threads associated with 'a' and 'b'
+  t_a = list_entry(a, struct thread, elem);
+  t_b = list_entry(b, struct thread, elem);
+
+  return t_a->start_time + t_a->sleep_time > t_b->start_time + t_b->sleep_time;
 }
