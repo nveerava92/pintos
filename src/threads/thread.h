@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -28,6 +29,12 @@ typedef int tid_t;
 #define NICE_MIN -20
 #define NICE_DEFAULT 0
 #define NICE_MAX 20
+
+#ifdef USERPROG
+#define RETURN_INIT 0
+#define RETURN_SUCCESS 0
+#define RETURN_ERROR -1
+#endif
 
 /* A kernel thread or user process.
 
@@ -108,6 +115,17 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct thread* parent;              /* Reference to parent thread */
+    struct semaphore sema_child;        /* Semaphore for the process's page */
+    struct file* exec;                  /* Reference to the executable running in the thread. */
+    struct list files;                  /* List of files opened by EXEC during execution. */
+    struct list children;               /* List of CHILD threads spawned by the thread. */
+    struct list_elem child_elem;        /* To include in the list PARENT->children. */
+
+    int32_t return_status;              /* To keep track of the user process's execution status. */
+    bool exited;                        /* Whether the user_process is done executing or not. */
+    bool parent_waiting;                /* Whether the parent of the user_process is waiting or not. */
+    struct semaphore sema_exit;         /* Semaphore for parent_waiting field so parent can wait on it. */
 #endif
 
     /* Owned by thread.c. */
@@ -162,5 +180,7 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void sort_ready_list (void);
+
+struct thread *thread_by_tid (tid_t tid);
 
 #endif /* threads/thread.h */

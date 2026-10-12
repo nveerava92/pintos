@@ -218,6 +218,26 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+  #ifdef USERPROG
+    t->pagedir = NULL;
+    t->parent = thread_current ();
+    sema_init (&t->sema_child, 0);
+    t->exec = NULL;
+    list_init (&t->files);
+    list_init (&t->children);
+
+    /* Add the new thread being created to CALLING THREAD->children
+       list.
+    */
+    if (thread_current () != initial_thread)
+      list_push_back (&thread_current ()->children, &t->child_elem);
+
+    t->return_status = RETURN_INIT;
+    t->exited = false;
+    t->parent_waiting = false;
+    sema_init (&t->sema_exit, 1);
+  #endif
+
   /* Add to ready queue. */
   thread_unblock (t);
 
@@ -772,4 +792,20 @@ thread_preempt (void)
         }
     }
   intr_set_level (old_level);
+}
+
+struct thread *
+thread_by_tid (tid_t tid)
+{
+  struct list_elem *e;
+
+  for (e = list_begin (&all_list); e != list_end (&all_list);
+       e = list_next (e))
+    {
+      struct thread *t = list_entry (e, struct thread, allelem);
+      if (t->tid == tid)
+        return t;
+    }
+
+  return NULL;
 }
