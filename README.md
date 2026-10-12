@@ -7,6 +7,7 @@ This repository records my attempt at a complete implementation of Stanford univ
 | Project | Status | Implementation | Design Document |
 | --- | --- | --- | --- |
 | Project 1: Threads | Complete — all 27 tests passed | [threads branch](../../tree/threads) | [DESIGNDOC_threads.md](../../blob/threads/src/threads/DESIGNDOC_threads.md) |
+| Project 2: User Programs | In progress — 54 of 80 tests passed | [userprog branch](../../tree/userprog) | [DESIGNDOC_userprog.md](../../blob/userprog/src/userprog/DESIGNDOC_userprog.md) |
 
 
 ## Installation Instructions
